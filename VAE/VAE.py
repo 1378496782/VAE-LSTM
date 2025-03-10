@@ -246,7 +246,6 @@ def train_model(model, train_dataset, val_dataset, n_epochs):
     beta = 0.1  # KL散度系数
     
     # 在损失计算部分修改
-    kl_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp()) * beta  # 添加权重
     history = dict(train=[], val=[])
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = float('inf')

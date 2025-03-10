@@ -34,6 +34,10 @@ def read_arff(file):
         df.columns = header
     return df
 
+PREFIX_NAME = 'AE2/'
+os.makedirs(PREFIX_NAME, exist_ok=True)
+MODEL_PATH = os.path.join(PREFIX_NAME, 'model.pth')
+
 # 数据有多种格式。我们将把arff文件加载到Pandas数据帧中:
 train=read_arff('../KDDTrain+.arff')
 test=read_arff('../KDDTest+.arff')
@@ -47,6 +51,8 @@ plt.bar(x,y_list)  # 画出训练集和测试集的数量分布柱状图
 plt.xticks([index for index in x], label_list)
 plt.xlabel("数据集")
 plt.ylabel('数量')
+plt.title("训练集和测试集的数量分布")
+plt.savefig(PREFIX_NAME + "训练集和测试集的数量分布.png")
 plt.show()
 
 # 我们将把训练和测试数据合并成一个数据帧。这将给我们更多的数据来训练我们的自动编码器。我们也会重组:
@@ -282,10 +288,6 @@ def load_or_train_model(model, train_dataset, val_dataset, n_epochs):
 N_EPOCHS = 20
 
 model = AutoEncoder().to(device)
-
-PREFIX_NAME = 'AE3/'
-os.makedirs(PREFIX_NAME, exist_ok=True)
-MODEL_PATH = os.path.join(PREFIX_NAME, 'model.pth')
 
 if not os.path.exists(MODEL_PATH):
     print("未找到预训练模型，开始训练...")
