@@ -1,0 +1,2 @@
+模型保存路径： VAE2/model.pth
+运行日志已保存至：VAE2/output.txt

@@ -37,6 +37,7 @@ def read_arff(file):
 PREFIX_NAME = 'AE2/'
 os.makedirs(PREFIX_NAME, exist_ok=True)
 MODEL_PATH = os.path.join(PREFIX_NAME, 'model.pth')
+print('模型保存路径：', MODEL_PATH)
 
 # 数据有多种格式。我们将把arff文件加载到Pandas数据帧中:
 train=read_arff('../KDDTrain+.arff')
@@ -47,12 +48,17 @@ print(test.shape)
 label_list=['train','test']
 y_list=[train.shape[0],test.shape[0]]
 x = range(len(label_list))
+
+# 新增画布尺寸和边距设置
+plt.figure(figsize=(8, 6))  # 加宽画布
+plt.subplots_adjust(left=0.15, right=0.9)  # 调整左右边距
+
 plt.bar(x,y_list)  # 画出训练集和测试集的数量分布柱状图
 plt.xticks([index for index in x], label_list)
 plt.xlabel("数据集")
 plt.ylabel('数量')
 plt.title("训练集和测试集的数量分布")
-plt.savefig(PREFIX_NAME + "训练集和测试集的数量分布.png")
+plt.savefig(PREFIX_NAME + "训练集和测试集的数量分布.png", bbox_inches='tight')  # 添加bbox参数plt.show()
 plt.show()
 
 # 我们将把训练和测试数据合并成一个数据帧。这将给我们更多的数据来训练我们的自动编码器。我们也会重组:

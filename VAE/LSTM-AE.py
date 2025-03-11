@@ -16,10 +16,22 @@ from sklearn.svm import SVC
 from collections import defaultdict
 from tqdm import tqdm
 import torch.utils.data as data
-import os
+import os, sys
 
 plt.rcParams['font.sans-serif'] = ['Hiragino Sans GB']
 matplotlib.rcParams['axes.unicode_minus'] = False
+
+class Tee:
+    """同时将输出写入文件和标准输出"""
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()  # 确保实时写入
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 # 定义一个函数来读取arff文件
 def read_arff(file):            
@@ -34,6 +46,16 @@ def read_arff(file):
         df.columns = header
     return df
 
+PREFIX_NAME = 'AE5/'
+os.makedirs(PREFIX_NAME, exist_ok=True)
+MODEL_PATH = os.path.join(PREFIX_NAME, 'model.pth')
+# 新增输出重定向
+output_path = os.path.join(PREFIX_NAME, 'output.txt')
+original_stdout = sys.stdout  # 保存原始输出
+sys.stdout = Tee(sys.stdout, open(output_path, 'w'))  # 双重输出
+print('模型保存路径：', MODEL_PATH)
+print(f'运行日志已保存至：{output_path}')
+
 # 数据有多种格式。我们将把arff文件加载到Pandas数据帧中:
 train=read_arff('../KDDTrain+.arff')
 test=read_arff('../KDDTest+.arff')
@@ -43,10 +65,17 @@ print(test.shape)
 label_list=['train','test']
 y_list=[train.shape[0],test.shape[0]]
 x = range(len(label_list))
+
+# 新增画布尺寸和边距设置
+plt.figure(figsize=(8, 6))  # 加宽画布
+plt.subplots_adjust(left=0.15, right=0.9)  # 调整左右边距
+
 plt.bar(x,y_list)  # 画出训练集和测试集的数量分布柱状图
 plt.xticks([index for index in x], label_list)
 plt.xlabel("数据集")
 plt.ylabel('数量')
+plt.title("训练集和测试集的数量分布")
+plt.savefig(PREFIX_NAME + "训练集和测试集的数量分布.png", bbox_inches='tight')  # 添加bbox参数plt.show()
 plt.show()
 
 # 我们将把训练和测试数据合并成一个数据帧。这将给我们更多的数据来训练我们的自动编码器。我们也会重组:
@@ -127,9 +156,9 @@ new_columns[-1] = 'target'
 df1.columns = new_columns
  # 无监督学习，不需要目标列
 normal_df = df1[df1.target == "normal"].drop(labels='target', axis=1)  # 正常数据
-print(normal_df.shape) 
+print("normal_df.shape =", normal_df.shape)  # 输出正常数据形状
 anomaly_df = df1[df1.target != "normal"].drop(labels='target', axis=1)  # 异常数据
-print(anomaly_df.shape)
+print("anomaly_df.shape =", anomaly_df.shape)  # 异常数据数量
 normal_df
 
 # 标准化和最小最大化数据
@@ -157,22 +186,23 @@ val_df, test_df = train_test_split(
   random_state=1
 )
 
-print(train_df.shape)  #  正常训练集数量
-print(val_df.shape)   # 正常验证集数量
-print(test_df.shape)  # 正常测试集数量
+print("训练集形状 =", train_df.shape)  # 正常训练集数量
+print("验证集形状 =", val_df.shape)   # 正常验证集数量
+print("测试集形状 =", test_df.shape)  # 正常测试集数量
 
 
 anomaly_df=anomaly_df.reshape(-1,1,41) # 异常测试集数量
-print(anomaly_df.shape)
+print("异常测试集形状 =", anomaly_df.shape)
+
 
 # 将数据变成30923*1*41的形状
 train_df=train_df.reshape(-1,1,41) 
 val_df=val_df.reshape(-1,1,41)
 test_df=test_df.reshape(-1,1,41)
-print(train_df.shape)  #  正常训练集数量
-print(val_df.shape)   # 正常验证集数量
-print(test_df.shape)  # 正常测试集数量
-print(type(train_df))
+print("重塑后训练集形状 =", train_df.shape)  # 正常训练集数量
+print("重塑后验证集形状 =", val_df.shape)   # 正常验证集数量
+print("重塑后测试集形状 =", test_df.shape)  # 正常测试集数量
+print("数据类型 =", type(train_df))
 
 # 将数据转化为张量
 def create_dataset(df):
@@ -191,113 +221,76 @@ test_anomaly_dataset, _, _ = create_dataset(anomaly_df) # 异常测试集
 class AutoEncoder(nn.Module):
     def __init__(self):
         super(AutoEncoder, self).__init__()
-        self.rnn_en1 = torch.nn.LSTM(  #41->20
-            input_size=41,
-            hidden_size=20,
-            num_layers=1,
-            batch_first=True
+        # 编码器结构
+        self.encoder = nn.Sequential(
+            nn.Linear(41, 20),
+            nn.ReLU(),
+            nn.Linear(20, 10),
+            nn.ReLU(),
+            nn.Linear(10, 2)  # 压缩到2维潜在空间
         )
-        self.rnn_en2 = torch.nn.LSTM(  #20->10
-            input_size=20,
-            hidden_size=10,
-            num_layers=1,
-            batch_first=True
+        # 解码器结构
+        self.decoder = nn.Sequential(
+            nn.Linear(2, 10),
+            nn.ReLU(),
+            nn.Linear(10, 20),
+            nn.ReLU(),
+            nn.Linear(20, 41),
+            nn.Sigmoid()  # 输出范围限制在0-1
         )
-        
-        self.out = torch.nn.Linear(in_features=10, out_features=2) # 10->2
-
-
-        self.rnn_de1 = torch.nn.LSTM(  # 2->10
-            input_size=2,
-            hidden_size=10,
-            num_layers=1,
-            batch_first=True
-        )
-        self.rnn_de2 = torch.nn.LSTM(  # 10->20
-            input_size=10,
-            hidden_size=20,
-            num_layers=1,
-            batch_first=True
-        )
-        self.out_2 = torch.nn.Linear(in_features=20, out_features=41) # 20->41
         
     def forward(self, x):
-        output, (h_n, c_n) = self.rnn_en1(x) # 41->20
-        output,(h_n, c_n)=self.rnn_en2(output.view(-1,1,20)) # 20->10
-        encode = self.out(output) # 10->2
-
-        output1, (h_n1, c_n1) = self.rnn_de1(encode.view(-1, 1, 2)) # 2->10
-        output1,(h_n1, c_n1)=self.rnn_de2(output1.view(-1, 1, 10)) # 10->20
-        decode = self.out_2(output1) # 20->41
-
-        encode=encode.squeeze(-1)
-        decode=decode.squeeze(-1)
-        return encode, decode
+        # 展平输入 [batch, 1, 41] -> [batch, 41]
+        x = x.view(-1, 41)
+        encoded = self.encoder(x)
+        decoded = self.decoder(encoded)
+        # 重塑回原始形状 [batch, 41] -> [batch, 1, 41]
+        return encoded.view(-1, 1, 2), decoded.view(-1, 1, 41)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # 模型加载
 model = AutoEncoder().to(device)
 
 # 训练模型
 def train_model(model, train_dataset, val_dataset, n_epochs):
-  optimizer = torch.optim.Adam(model.parameters(), lr=1e-3) # 优化器
-  criterion = nn.MSELoss(reduction='sum').to(device) # 损失函数使用MSE
-  history = dict(train=[], val=[])  # 记录训练数据的误差损失和验证集的误差损失
-  best_model_wts = copy.deepcopy(model.state_dict())
-  best_loss = 10000.0  # 初始化最大损失
-  for epoch in range(1, n_epochs + 1):
-    model = model.train()  # 切换到训练模式
-    train_losses = []  # 训练误差
-    for seq_true in train_dataset:
-      optimizer.zero_grad()  # 梯度清零
-      seq_true = seq_true.to(device)
-      seq_compressed,seq_pred = model(seq_true.view(-1,1,41))  # 获得压缩后的数据和还原的数据
-      loss = criterion(seq_pred, seq_true.view(-1,1,41)) # 求原始数据和还原后的数据的重构误差损失
-      loss.backward()  # 误差反向传播
-      optimizer.step()  # 更新参数
-      train_losses.append(loss.item())
-    val_losses = []
-    model = model.eval() # 切换到eval模式  不需要梯度更新
-    with torch.no_grad():  # 不需要梯度
-      for seq_true in val_dataset:  # 验证集 防止过拟合
-        # seq_true=seq_true.view(-1,1,41)
-        seq_true = seq_true.to(device)
-        _,seq_pred = model(seq_true.view(-1,1,41))
-        loss = criterion(seq_pred, seq_true.view(-1,1,41))  # 验证集误差
-        val_losses.append(loss.item())
-    train_loss = np.mean(train_losses) # 取误差平均
-    val_loss = np.mean(val_losses)
-    history['train'].append(train_loss)
-    history['val'].append(val_loss)
-    if val_loss < best_loss: # 更新损失误差
-      best_loss = val_loss
-      best_model_wts = copy.deepcopy(model.state_dict())
-    print(f'Epoch {epoch}: train loss {train_loss} val loss {val_loss}')
-  model.load_state_dict(best_model_wts)
-  return model.eval(), history
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3) # 优化器
+    criterion = nn.MSELoss(reduction='sum').to(device) # 损失函数使用MSE
+    history = dict(train=[], val=[])  # 记录训练数据的误差损失和验证集的误差损失
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_loss = 10000.0  # 初始化最大损失
+    for epoch in range(1, n_epochs + 1):
+        model = model.train()  # 切换到训练模式
+        train_losses = []  # 训练误差
+        for seq_true in train_dataset:
+            optimizer.zero_grad()
+            seq_true = seq_true.to(device)
+            # 输入形状保持 [batch, 1, 41]
+            seq_compressed, seq_pred = model(seq_true)  # 直接使用原始形状
+            loss = criterion(seq_pred, seq_true.view(-1,1,41)) # 求原始数据和还原后的数据的重构误差损失
+            loss.backward()  # 误差反向传播
+            optimizer.step()  # 更新参数
+            train_losses.append(loss.item())
+        val_losses = []
+        model = model.eval() # 切换到eval模式  不需要梯度更新
+        with torch.no_grad():  # 不需要梯度
+            for seq_true in val_dataset:
+                seq_true = seq_true.to(device)
+                _, seq_pred = model(seq_true)  # 保持输入形状不变
+                loss = criterion(seq_pred, seq_true.view(-1,1,41))  # 验证集误差
+                val_losses.append(loss.item())
+        train_loss = np.mean(train_losses) # 取误差平均
+        val_loss = np.mean(val_losses)
+        history['train'].append(train_loss)
+        history['val'].append(val_loss)
+        if val_loss < best_loss: # 更新损失误差
+            best_loss = val_loss
+            best_model_wts = copy.deepcopy(model.state_dict())
+        print(f'Epoch {epoch}: train loss {train_loss} val loss {val_loss}')
+    model.load_state_dict(best_model_wts)
+    return model.eval(), history
 
-def load_or_train_model(model, train_dataset, val_dataset, n_epochs):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    try:
-        # 先尝试加载已有模型
-        if os.path.exists(MODEL_PATH):
-            print(f"发现预训练模型 {MODEL_PATH}，正在加载...")
-            model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-            model = model.to(device)
-            print("模型加载成功，跳过训练阶段")
-            return model, None  # 返回空训练历史
-        else:
-            raise FileNotFoundError
-    except (FileNotFoundError, RuntimeError, EOFError) as e:
-        print(f"模型加载失败 ({str(e)})，开始新训练...")
-        return train_model(model, train_dataset, val_dataset, n_epochs)
-
-N_EPOCHS = 20
+N_EPOCHS = 100
 
 model = AutoEncoder().to(device)
-
-PREFIX_NAME = 'AE3/'
-os.makedirs(PREFIX_NAME, exist_ok=True)
-MODEL_PATH = os.path.join(PREFIX_NAME, 'model.pth')
 
 if not os.path.exists(MODEL_PATH):
     print("未找到预训练模型，开始训练...")
@@ -325,8 +318,259 @@ if len(y1) > 0 and len(y2) > 0:  # 仅当有训练历史时绘图
     x = [i for i in range(1, len(y1)+1)]  # 动态生成x轴数据
     plt.plot(x, y1, label='train_loss')
     plt.plot(x, y2, label='val_loss')
+    plt.xlabel('训练轮次')
+    plt.ylabel('损失值')
     plt.legend()
     plt.savefig(PREFIX_NAME + 'train_loss.png')
     plt.show()
 else:
     print("无训练历史数据，跳过绘图步骤")
+
+# 用训练好的模型来预测
+def predict(model, dataset):
+  compressed,predictions, losses = [], [],[]
+  criterion = nn.MSELoss(reduction='sum').to(device)
+  with torch.no_grad():
+    model = model.eval()
+    for seq_true in dataset:
+      seq_true=seq_true.view(-1,1,41)
+      seq_true = seq_true.to(device)
+      seq_compressed,seq_pred = model(seq_true)
+      loss = criterion(seq_pred, seq_true)
+      predictions.append(seq_pred.cpu().numpy().flatten())
+      compressed.append(seq_compressed.cpu().numpy().flatten())
+      losses.append(loss.item())
+  return  compressed,predictions, losses
+
+# 绘制正常训练集重构损失核函数图
+_,_, losses = predict(model, train_dataset)
+sns.histplot(losses, bins=50, kde=True);
+plt.xlabel('重构损失')
+plt.ylabel('密度')
+plt.savefig(PREFIX_NAME + '正常训练集重构损失核函数图.png')
+plt.show()
+
+# 绘制正常测试集重构损失核函数图  
+_,predictions, pred_losses1 = predict(model, test_normal_dataset)
+sns.histplot(pred_losses1, bins=50, kde=True);
+plt.xlabel('重构损失')
+plt.ylabel('密度')
+plt.savefig(PREFIX_NAME + '正常测试集重构损失核函数图.png')
+plt.show()
+
+# 输出训练集  测试集损失误差的平均值
+print('正常训练集重构损失均值', np.mean(losses))
+print('正常测试集重构损失均值', np.mean(pred_losses1))
+
+# 验证异常测试数据  
+anomaly_dataset = test_anomaly_dataset[:len(test_normal_dataset)]  # 选择和正常测试集一样的数据量
+_,predictions, pred_losses2 = predict(model, anomaly_dataset)
+sns.histplot(pred_losses2, bins=50, kde=True)
+plt.xlabel('重构损失')
+plt.ylabel('密度')
+plt.savefig(PREFIX_NAME + '异常测试集重构损失核函数图.png')
+plt.show()
+
+# 将正常数据测试集和异常数据测试集的误差分布放到一个图中
+recon_err_test_normal = pred_losses1
+recon_err_test_anomaly = pred_losses2
+sns.kdeplot(recon_err_test_normal,fill=True,label='正常数据')
+sns.kdeplot(recon_err_test_anomaly,fill=True,label='异常数据')
+plt.xlabel('重构损失')
+plt.ylabel('密度分布')
+plt.legend()  
+plt.savefig(PREFIX_NAME + 'result.png')  
+plt.show()
+
+threshold_range=np.linspace(0,8,1000) # 根据上图将可能取到的阈值区间划分为1000份
+correct_rate_test_noraml=0
+correct_rate_test_anomaly=0
+acc_list=[]
+rate_normal=[]
+rate_anomaly=[]
+for t in threshold_range:  # 计算不同阈值下正常数据被判断正确的概率和异常数据被判断正确的概率
+    correct_rate_test_noraml=(sum(l <= t for l in pred_losses1)/len(test_normal_dataset))
+    correct_rate_test_anomaly=(sum(l > t for l in pred_losses2)/len(test_normal_dataset))
+    rate_normal.append(correct_rate_test_noraml)
+    rate_anomaly.append(correct_rate_test_anomaly)
+
+    
+# 准确率曲线部分
+plt.plot(threshold_range, rate_normal, label='正常数据准确率')
+plt.plot(threshold_range, rate_anomaly, label='异常数据准确率')
+plt.xlabel('阈值')
+plt.ylabel('准确率')
+plt.legend()
+plt.savefig(PREFIX_NAME + 'accuracy.png')
+plt.show()
+
+df2 # 再用df2来检测以下我们的的自编码器模型
+
+X_NormalAndAnomaly=df2.iloc[:,0:-1]  #  取除了label外的列
+Y_NormalAndAnomaly=df2.iloc[:,-1]    #  只取label列
+
+z_scaler= preprocessing.StandardScaler()  # 标准化
+X_NormalAndAnomaly=z_scaler.fit_transform(X_NormalAndAnomaly)
+
+
+m_scaler = preprocessing.MinMaxScaler()  # 最大最小化
+X_NormalAndAnomaly = m_scaler.fit_transform(X_NormalAndAnomaly)
+
+
+X_NormalAndAnomaly=X_NormalAndAnomaly.reshape(-1,1,41) # 改变形状适应模型的input_size
+X_NormalAndAnomaly,_,_= create_dataset(X_NormalAndAnomaly )
+
+_,_, losses = predict(model, X_NormalAndAnomaly)  # losses中包含了正常数据的重构误差也包含了异常数据的重构误差
+
+
+real_normal_count=0
+real_anomal_count=0
+y=[]
+Y_NormalAndAnomaly
+for i in range(0,len(Y_NormalAndAnomaly)):
+    y.append(Y_NormalAndAnomaly[i])
+    #print(Y_NormalAndAnomaly[i])
+    if Y_NormalAndAnomaly[i]=="normal":
+        real_normal_count=real_normal_count+1
+    if Y_NormalAndAnomaly[i]=="anomaly":
+        real_anomal_count=real_anomal_count+1
+print('df2中正常数据的数量', real_normal_count)   # df2中正常数据的数量
+print('df2中异常数据的数量', real_anomal_count)  # df2中异常数据的数量
+
+FPR=[]
+TPR=[]
+labels=y
+threshold_range=np.linspace(0.1,12,1000)  #  阈值区间划分
+for t in threshold_range:
+    judge=[]
+#     print(t)
+    for i in range(0,len(losses)):
+        if losses[i]<=t:
+            judge.append("normal")
+        else:
+            judge.append("anomaly")
+    TP=0
+    TN=0
+    FP=0
+    FN=0
+    #print(judge[0:100])
+    for x1,y1 in zip(labels,judge):
+        if x1=="normal" and y1=="normal":
+            TP=TP+1
+        elif x1=="anomaly" and y1=="anomaly":
+            TN=TN+1
+        elif x1=="normal" and y1=="anomaly":
+            FN=FN+1
+        elif x1=="anomaly" and y1=="normal":
+            FP=FP+1
+      
+    TPR.append(TP/(TP+FN)) # 预测为正且实际为正的样本占所有正例样本的比例。
+    FPR.append(FP/(FP+TN)) # 预测为正但实际为负的样本占所有负例样本的比例
+    
+            
+plt.title('ROC ')  # 绘制ROC曲线  横轴为fpr  纵轴为tpr
+x1=np.linspace(0,1,1000)
+y1=np.linspace(0,1,1000)
+plt.plot(FPR,TPR,color="red")
+plt.plot(x1,y1,color="blue")
+plt.xlabel('假正率(FPR)')
+plt.ylabel('真正率(TPR)')
+plt.savefig(PREFIX_NAME + "ROC.png")
+plt.show()
+
+# ROC曲线中离（0，1）点最近的点所代表的阈值是分类效果最好的 为求得这个阈值 可以用ROC曲线上面的点到
+# 直线y=x这条直线上的距离来反映  距离越大  阈值对于二分类的效果就越好
+dis=0
+i=-1
+maxIndex=-1
+for x_fpr,y_tpr in zip(FPR,TPR):
+    i=i+1
+    newDis=np.abs(x_fpr*1-y_tpr*1+0)/np.sqrt(4)
+    if newDis>dis:
+        dis=newDis
+        maxIndex=i
+        
+threshold_range[maxIndex]    
+
+THRESHOLD=threshold_range[maxIndex]   # 最佳阈值
+
+print('最佳阈值为：',THRESHOLD)
+
+# 正常测试集的准确率
+correct = sum(l <= THRESHOLD for l in pred_losses1)
+print(f'Correct normal predictions: {correct}/{len(test_normal_dataset)}')
+print('Accuracy:',(correct/len(test_normal_dataset)))
+
+# 异常常测试集的准确率
+correct = sum(l >= THRESHOLD for l in pred_losses2)
+print(f'Correct anormaly predictions: {correct}/{len(anomaly_dataset)}')
+print('Accuracy:',(correct/len(anomaly_dataset)))
+
+# df2（正常异常混合数据）的检测准确率
+normal_num=0
+anomaly_num=0
+detect_ans=[]
+for i in range(0,len(losses)):
+    if losses[i]<=THRESHOLD:
+        detect_ans.append("normal")
+        if y[i]=="normal":
+              normal_num=normal_num+1
+        #print("正常:",i)
+     
+    if losses[i]>THRESHOLD:
+        detect_ans.append("anomaly")
+        if y[i]!="normal":
+            anomaly_num=anomaly_num+1
+       # print("异常:",i)
+
+print(normal_num,"/",real_normal_count)   
+print("正常数据检测准确率",normal_num/real_normal_count)
+print(anomaly_num,"/",real_anomal_count)
+print("异常数据检测准确率",anomaly_num/real_anomal_count)
+
+# 将预测结果以DataFrame的形式展现
+loss=losses
+thresholdlist=[THRESHOLD for i in range(0,len(loss))]
+labels=y
+judge=detect_ans
+TF_state=[]
+for x1,y1 in zip(labels,judge):
+    if x1==y1:
+        TF_state.append("√")
+    else:
+        TF_state.append("×")
+data={"loss":loss,"threshold":thresholdlist,"predict":judge,"labels":labels,"T/F?":TF_state}
+result=pd.DataFrame(data)
+result.head(20)
+
+# 新增保存预测结果到CSV文件
+result.to_csv(os.path.join(PREFIX_NAME, 'prediction_results.csv'), 
+             index=False, encoding='utf_8_sig')  # 保存完整结果
+print(f'预测结果已保存至：{os.path.join(PREFIX_NAME, "prediction_results.csv")}')
+
+# 对于df2数据计算准确率、精确率、召回率、f1分数这四个指标
+TP=0
+TN=0
+FP=0
+FN=0
+thread_range=np.linspace(0,12,1000)
+for x,y in zip(labels,judge):
+    if x==y:
+        if x=="normal":
+            TP=TP+1
+        else:
+            TN=TN+1
+    else:
+        if x=="normal":  # 把正常的判断成了不正常的
+            FP=FP+1
+        else:   # 把不正常的判断成了正常的
+            FN=FN+1  
+
+accuracy=(TP+TN)/(TP+TN+FP+FN)  # 准确率  所有的预测正确（正类负类）的占总的比重
+precision=TP/(TP+FP)  #  精确率  预测为正样本的结果中，我们有多少把握可以预测正确
+recall=TP/(TP+FN)   # 召回率  在实际为正的样本中被预测为正样本的概率
+f1=(2*TP)/(2*TP+FP+FN)
+print("准确率:",accuracy)
+print("精确率:",precision)
+print("召回率:",recall)
+print("f1分数:",f1)
