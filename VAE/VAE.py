@@ -47,7 +47,7 @@ def read_arff(file):
         df.columns = header
     return df
 
-PREFIX_NAME = 'VAE2/'
+PREFIX_NAME = 'VAE3/'
 os.makedirs(PREFIX_NAME, exist_ok=True)
 MODEL_PATH = os.path.join(PREFIX_NAME, 'model.pth')
 # 新增输出重定向
