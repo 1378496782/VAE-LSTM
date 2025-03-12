@@ -2,7 +2,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['font.sans-serif'] = ['Hiragino Sans GB']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 模型数据
