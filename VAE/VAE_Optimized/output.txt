@@ -1,0 +1,97 @@
+模型保存路径： VAE_Optimized/model.pth
+运行日志已保存至：VAE_Optimized/output.txt
+加载数据...
+训练数据形状: (125973, 42)
+测试数据形状: (22544, 42)
+
+数据预处理...
+合并后数据集大小: (148517, 42)
+
+数据集划分...
+正常数据形状: (37235, 41)
+异常数据形状: (32765, 41)
+
+标准化和归一化...
+
+划分训练集、验证集和测试集...
+训练集形状: (31649, 41)
+验证集形状: (3742, 41)
+测试集(正常)形状: (1844, 41)
+测试集(异常)形状: (32765, 41)
+
+创建PyTorch数据集...
+使用设备: cpu
+创建VAE模型...
+VAE(
+  (encoder): Sequential(
+    (0): Linear(in_features=41, out_features=20, bias=True)
+    (1): BatchNorm1d(20, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): ReLU()
+    (3): Dropout(p=0.2, inplace=False)
+    (4): Linear(in_features=20, out_features=10, bias=True)
+    (5): BatchNorm1d(10, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (6): ReLU()
+    (7): Dropout(p=0.2, inplace=False)
+  )
+  (fc_mu): Linear(in_features=10, out_features=2, bias=True)
+  (fc_var): Linear(in_features=10, out_features=2, bias=True)
+  (decoder): Sequential(
+    (0): Linear(in_features=2, out_features=10, bias=True)
+    (1): BatchNorm1d(10, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (2): ReLU()
+    (3): Dropout(p=0.2, inplace=False)
+    (4): Linear(in_features=10, out_features=20, bias=True)
+    (5): BatchNorm1d(20, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    (6): ReLU()
+    (7): Dropout(p=0.2, inplace=False)
+    (8): Linear(in_features=20, out_features=41, bias=True)
+    (9): Sigmoid()
+  )
+)
+Epoch 1: train loss nan (recon: nan, kl: nan) | val loss 9.7937 (recon: 9.7201, kl: 0.0737)
+Epoch 2: train loss nan (recon: nan, kl: nan) | val loss 9.7929 (recon: 9.7193, kl: 0.0737)
+Epoch 3: train loss nan (recon: nan, kl: nan) | val loss 9.7942 (recon: 9.7206, kl: 0.0737)
+Epoch 4: train loss nan (recon: nan, kl: nan) | val loss 9.7952 (recon: 9.7215, kl: 0.0737)
+Epoch 5: train loss nan (recon: nan, kl: nan) | val loss 9.7946 (recon: 9.7209, kl: 0.0737)
+Epoch 6: train loss nan (recon: nan, kl: nan) | val loss 9.7926 (recon: 9.7190, kl: 0.0737)
+Epoch 7: train loss nan (recon: nan, kl: nan) | val loss 9.7944 (recon: 9.7208, kl: 0.0737)
+Epoch 8: train loss nan (recon: nan, kl: nan) | val loss 9.7949 (recon: 9.7212, kl: 0.0737)
+Epoch 9: train loss nan (recon: nan, kl: nan) | val loss 9.7948 (recon: 9.7211, kl: 0.0737)
+Epoch 10: train loss nan (recon: nan, kl: nan) | val loss 9.7928 (recon: 9.7192, kl: 0.0737)
+Epoch 11: train loss nan (recon: nan, kl: nan) | val loss 9.7946 (recon: 9.7209, kl: 0.0737)
+Epoch 12: train loss nan (recon: nan, kl: nan) | val loss 9.7940 (recon: 9.7204, kl: 0.0737)
+Epoch 13: train loss nan (recon: nan, kl: nan) | val loss 9.7949 (recon: 9.7212, kl: 0.0737)
+Epoch 14: train loss nan (recon: nan, kl: nan) | val loss 9.7924 (recon: 9.7188, kl: 0.0737)
+Epoch 15: train loss nan (recon: nan, kl: nan) | val loss 9.7931 (recon: 9.7195, kl: 0.0737)
+Epoch 16: train loss nan (recon: nan, kl: nan) | val loss 9.7936 (recon: 9.7199, kl: 0.0737)
+Epoch 17: train loss nan (recon: nan, kl: nan) | val loss 9.7947 (recon: 9.7211, kl: 0.0737)
+Epoch 18: train loss nan (recon: nan, kl: nan) | val loss 9.7933 (recon: 9.7196, kl: 0.0737)
+Epoch 19: train loss nan (recon: nan, kl: nan) | val loss 9.7962 (recon: 9.7225, kl: 0.0737)
+Epoch 20: train loss nan (recon: nan, kl: nan) | val loss 9.7970 (recon: 9.7234, kl: 0.0737)
+Epoch 21: train loss nan (recon: nan, kl: nan) | val loss 9.7953 (recon: 9.7217, kl: 0.0737)
+Epoch 22: train loss nan (recon: nan, kl: nan) | val loss 9.7945 (recon: 9.7208, kl: 0.0737)
+Epoch 23: train loss nan (recon: nan, kl: nan) | val loss 9.7927 (recon: 9.7190, kl: 0.0737)
+Epoch 24: train loss nan (recon: nan, kl: nan) | val loss 9.7917 (recon: 9.7180, kl: 0.0737)
+Epoch 25: train loss nan (recon: nan, kl: nan) | val loss 9.7971 (recon: 9.7235, kl: 0.0737)
+Epoch 26: train loss nan (recon: nan, kl: nan) | val loss 9.7931 (recon: 9.7194, kl: 0.0737)
+Epoch 27: train loss nan (recon: nan, kl: nan) | val loss 9.7956 (recon: 9.7219, kl: 0.0737)
+Epoch 28: train loss nan (recon: nan, kl: nan) | val loss 9.7938 (recon: 9.7201, kl: 0.0737)
+Epoch 29: train loss nan (recon: nan, kl: nan) | val loss 9.7953 (recon: 9.7217, kl: 0.0737)
+Epoch 30: train loss nan (recon: nan, kl: nan) | val loss 9.7937 (recon: 9.7201, kl: 0.0737)
+Epoch 31: train loss nan (recon: nan, kl: nan) | val loss 9.7953 (recon: 9.7217, kl: 0.0737)
+Epoch 32: train loss nan (recon: nan, kl: nan) | val loss 9.7933 (recon: 9.7197, kl: 0.0737)
+Epoch 33: train loss nan (recon: nan, kl: nan) | val loss 9.7952 (recon: 9.7216, kl: 0.0737)
+Epoch 34: train loss nan (recon: nan, kl: nan) | val loss 9.7937 (recon: 9.7200, kl: 0.0737)
+Early stopping triggered after 34 epochs!
+模型已保存至: VAE_Optimized/model.pth
+绘制损失曲线...
+绘制重构误差分布...
+绘制潜在空间分布...
+normal_latent shape: (1844, 1, 2)
+anomaly_latent shape: (32765, 1, 2)
+Latent space has less than 2 dimensions, cannot plot.
+计算最佳阈值...
+最佳阈值: 9.5518
+绘制ROC曲线...
+正常数据检测准确率: 557/1844 = 0.3021
+异常数据检测准确率: 21141/32765 = 0.6452
